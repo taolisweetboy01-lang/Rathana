@@ -108,11 +108,36 @@ export function calculateATR(candles: Candle[], period = 14): number {
   return atr || 1.0;
 }
 
-// Live Candle Fetcher from Binance Public Spot REST API (CORS enabled worldwide)
+// Live Candle Fetcher: Spot Gold (OANDA Benchmark) for XAUUSD & Binance for BTCUSD
 export async function fetchLiveCandles(symbol: "XAUUSD" | "BTCUSD", interval = "5m"): Promise<Candle[]> {
-  // BTCUSD uses BTCUSDT. XAUUSD uses PAXGUSDT (London physical spot gold token, 1:1 ounce gold benchmark)
-  const apiSymbol = symbol === "BTCUSD" ? "BTCUSDT" : "PAXGUSDT";
-  const url = `https://api.binance.com/api/v3/klines?symbol=${apiSymbol}&interval=${interval}&limit=60`;
+  if (symbol === "XAUUSD") {
+    // Spot Gold (OANDA:XAUUSD / London Spot benchmark)
+    const bybitTf = interval === "1m" ? "1" : interval === "15m" ? "15" : "5";
+    const url = `https://api.bybit.com/v5/market/kline?category=linear&symbol=XAUUSDT&interval=${bybitTf}&limit=60`;
+    try {
+      const res = await fetch(url, { cache: "no-store" });
+      if (res.ok) {
+        const json = await res.json();
+        const list = json?.result?.list;
+        if (Array.isArray(list) && list.length >= 10) {
+          return list.slice().reverse().map((k: any) => ({
+            time: parseInt(k[0]),
+            open: parseFloat(k[1]),
+            high: parseFloat(k[2]),
+            low: parseFloat(k[3]),
+            close: parseFloat(k[4]),
+            volume: parseFloat(k[5]),
+          }));
+        }
+      }
+    } catch (e) {
+      console.warn("Spot gold candle fetch error:", e);
+    }
+  }
+
+  // BTCUSD or Fallback: Binance Spot REST API
+  const apiSymbol = symbol === "BTCUSD" ? "BTCUSDT" : "BTCUSDT";
+  const url = `https://data-api.binance.vision/api/v3/klines?symbol=${apiSymbol}&interval=${interval}&limit=60`;
 
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) {

@@ -134,6 +134,22 @@
   overflow-y: auto;
 }
 
+/* Full Edge-to-Edge Responsiveness for Chart Tab (Zero padding/margins/borders) */
+.main-content.chart-fullscreen {
+  padding: 0 0 65px 0 !important;
+  gap: 0 !important;
+  overflow-x: hidden;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.chart-fullscreen .tradingview-edge-to-edge {
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+}
+
 /* Market Switch */
 .market-switch {
   display: grid;

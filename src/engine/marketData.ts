@@ -26,66 +26,101 @@ export class RealMarketDataProvider implements MarketDataProvider {
     const tfMeta = TIMEFRAME_MAP[timeframe];
     if (!tfMeta) return null;
 
-    // 1. Fetch from Binance Vision / API
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
+    // 1. For XAUUSD: Fetch from Bybit XAUUSDT (London Spot Gold / OANDA Benchmark)
+    // For BTCUSD: Fetch from Binance BTCUSDT
+    if (symbol === "XAUUSD") {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
 
-      const url = `https://data-api.binance.vision/api/v3/klines?symbol=${config.feedSymbol}&interval=${tfMeta.binance}&limit=${limit}`;
-      const res = await fetch(url, { cache: "no-store", signal: controller.signal });
-      clearTimeout(timeoutId);
+        const url = `https://api.bybit.com/v5/market/kline?category=linear&symbol=XAUUSDT&interval=${tfMeta.bybit}&limit=${limit}`;
+        const res = await fetch(url, { cache: "no-store", signal: controller.signal });
+        clearTimeout(timeoutId);
 
-      if (res.ok) {
-        const raw = await res.json();
-        if (Array.isArray(raw) && raw.length >= 10) {
-          const parsed = raw.map((k: any) => ({
-            time: Number(k[0]),
-            open: parseFloat(k[1]),
-            high: parseFloat(k[2]),
-            low: parseFloat(k[3]),
-            close: parseFloat(k[4]),
-            volume: parseFloat(k[5]),
-          }));
+        if (res.ok) {
+          const json = await res.json();
+          const list = json?.result?.list;
+          if (Array.isArray(list) && list.length >= 10) {
+            const parsed = list.slice().reverse().map((k: any) => ({
+              time: parseInt(k[0]),
+              open: parseFloat(k[1]),
+              high: parseFloat(k[2]),
+              low: parseFloat(k[3]),
+              close: parseFloat(k[4]),
+              volume: parseFloat(k[5]),
+            }));
 
-          if (this.validateCandles(parsed, tfMeta.minutes)) {
-            return parsed;
+            if (this.validateCandles(parsed, tfMeta.minutes)) {
+              return parsed;
+            }
           }
         }
+      } catch (e) {
+        // Fallback
       }
-    } catch (e) {
-      // Continue to fallback
+    } else {
+      // BTCUSD: Fetch from Binance
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+        const url = `https://data-api.binance.vision/api/v3/klines?symbol=${config.feedSymbol}&interval=${tfMeta.binance}&limit=${limit}`;
+        const res = await fetch(url, { cache: "no-store", signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const raw = await res.json();
+          if (Array.isArray(raw) && raw.length >= 10) {
+            const parsed = raw.map((k: any) => ({
+              time: Number(k[0]),
+              open: parseFloat(k[1]),
+              high: parseFloat(k[2]),
+              low: parseFloat(k[3]),
+              close: parseFloat(k[4]),
+              volume: parseFloat(k[5]),
+            }));
+
+            if (this.validateCandles(parsed, tfMeta.minutes)) {
+              return parsed;
+            }
+          }
+        }
+      } catch (e) {
+        // Fallback
+      }
     }
 
-    // 2. Fallback to Bybit Linear API
-    try {
-      const bybitSymbol = symbol === "XAUUSD" ? "XAUUSDT" : "BTCUSDT";
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
+    // 2. Secondary Fallback for BTCUSD
+    if (symbol === "BTCUSD") {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
 
-      const url = `https://api.bybit.com/v5/market/kline?category=linear&symbol=${bybitSymbol}&interval=${tfMeta.bybit}&limit=${limit}`;
-      const res = await fetch(url, { cache: "no-store", signal: controller.signal });
-      clearTimeout(timeoutId);
+        const url = `https://api.bybit.com/v5/market/kline?category=linear&symbol=BTCUSDT&interval=${tfMeta.bybit}&limit=${limit}`;
+        const res = await fetch(url, { cache: "no-store", signal: controller.signal });
+        clearTimeout(timeoutId);
 
-      if (res.ok) {
-        const json = await res.json();
-        const list = json?.result?.list;
-        if (Array.isArray(list) && list.length >= 10) {
-          const parsed = list.slice().reverse().map((k: any) => ({
-            time: parseInt(k[0]),
-            open: parseFloat(k[1]),
-            high: parseFloat(k[2]),
-            low: parseFloat(k[3]),
-            close: parseFloat(k[4]),
-            volume: parseFloat(k[5]),
-          }));
+        if (res.ok) {
+          const json = await res.json();
+          const list = json?.result?.list;
+          if (Array.isArray(list) && list.length >= 10) {
+            const parsed = list.slice().reverse().map((k: any) => ({
+              time: parseInt(k[0]),
+              open: parseFloat(k[1]),
+              high: parseFloat(k[2]),
+              low: parseFloat(k[3]),
+              close: parseFloat(k[4]),
+              volume: parseFloat(k[5]),
+            }));
 
-          if (this.validateCandles(parsed, tfMeta.minutes)) {
-            return parsed;
+            if (this.validateCandles(parsed, tfMeta.minutes)) {
+              return parsed;
+            }
           }
         }
+      } catch (e) {
+        // Fallback failed
       }
-    } catch (e) {
-      // Fallback failed
     }
 
     return null;

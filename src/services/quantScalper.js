@@ -71,11 +71,38 @@ export function calculateATR(highs, lows, closes, period = 14) {
   return parseFloat(atr.toFixed(2));
 }
 
-// ទាញយក Candlestick Data ពី Binance / Bybit
+// ទាញយក Candlestick Data ពី Bybit (Spot Gold) / Binance (BTC)
 export async function fetchMarketKlines(symbol, interval = "1m", limit = 30) {
-  // A. Binance Vision Spot API (CORS Friendly)
+  if (symbol.includes("XAU")) {
+    try {
+      const bybitTf = interval === "1m" ? "1" : interval === "15m" ? "15" : "5";
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const res = await fetch(
+        `https://api.bybit.com/v5/market/kline?category=linear&symbol=XAUUSDT&interval=${bybitTf}&limit=${limit}`,
+        { cache: "no-store", signal: controller.signal }
+      );
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        const json = await res.json();
+        const list = json?.result?.list;
+        if (Array.isArray(list) && list.length > 0) {
+          return list.slice().reverse().map((k) => ({
+            time: parseInt(k[0]),
+            open: parseFloat(k[1]),
+            high: parseFloat(k[2]),
+            low: parseFloat(k[3]),
+            close: parseFloat(k[4]),
+            volume: parseFloat(k[5]),
+          }));
+        }
+      }
+    } catch (e) {}
+  }
+
+  // Binance Vision Spot API (CORS Friendly) for BTC
   try {
-    const spotSymbol = symbol.includes("XAU") ? "PAXGUSDT" : "BTCUSDT";
+    const spotSymbol = "BTCUSDT";
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 2000);
     const res = await fetch(

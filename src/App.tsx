@@ -1162,18 +1162,7 @@ function App() {
           </div>
         </div>
 
-        {/* Filter Pills */}
-        <div className="journal-filter-row">
-          {["ALL", "HIT_TP1", "HIT_TP2", "HIT_SL"].map((f) => (
-            <button
-              key={f}
-              className={`filter-pill ${journalFilter === f ? "active" : ""}`}
-              onClick={() => setJournalFilter(f)}
-            >
-              {f === "ALL" ? "ទាំងអស់" : f.replace("_", " ")}
-            </button>
-          ))}
-        </div>
+        {/* Filter Pills - Removed TP1 HIT, TP2 HIT, SL HIT filter buttons as requested */}
 
         {/* Journal Entries List */}
         <div className="journal-list">

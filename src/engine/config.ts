@@ -8,7 +8,7 @@ import { SupportedSymbol, SymbolConfig } from "./types";
 export const SYMBOL_CONFIGS: Record<SupportedSymbol, SymbolConfig> = {
   XAUUSD: {
     symbol: "XAUUSD",
-    feedSymbol: "PAXGUSDT",
+    feedSymbol: "XAUUSDT",    // Spot Gold (OANDA / London Spot Benchmark)
     pipSize: 0.1,             // 1 pip = $0.10
     pointMultiplier: 1.0,     // 1 dollar move
     slBufferPips: 3.5,        // 0.35 buffer past structural swing

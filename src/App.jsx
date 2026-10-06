@@ -8,13 +8,187 @@ import { playSignalChime, playNewsWarningTone } from "./services/soundNotifier";
 import TradingViewChart from "./components/TradingViewChart";
 import AdminMemberManager from "./components/AdminMemberManager";
 import ConfidenceBreakdownModal from "./components/ConfidenceBreakdownModal";
+import {
+  registeredStrategies,
+  getStrategyByNumber,
+  STORAGE_KEY_STRATEGY_SOUND,
+  STORAGE_KEY_ACTIVE_STRATEGY,
+  DEFAULT_STRATEGY_SOUNDS,
+} from "./strategies/index.ts";
+import {
+  generateStrategyJournalReport,
+  generateAllStrategiesComparison,
+  LOT_SIZE_OPTIONS,
+  getLotSizeMultiplier,
+} from "./engine/strategyJournalBacktest";
 
 const MARKETS = ["XAUUSD", "BTCUSD"];
 
-const STORAGE_KEY_POSITIONS = "master_ai_active_positions_v5";
+const STORAGE_KEY_POSITIONS = "master_ai_active_positions_v7";
 
 const DEFAULT_ACTIVE_POSITIONS = {
+  // Strategy 01: Breakout & Structural Retest (Price Action S/R)
+  "01_XAUUSD": {
+    strategyNumber: "01",
+    strategyName: "Strategy 01: Breakout & Structural Retest (Price Action S/R)",
+    symbol: "XAUUSD",
+    status: "BUY",
+    trend: "BULLISH",
+    setup: "VALID_BULLISH_RETEST",
+    entry: 4162.50,
+    stopLoss: 4156.50,
+    tp1: 4168.50,
+    tp2: 4174.50,
+    riskReward: "1:2",
+    riskDistance: 6.00,
+    confidenceScore: 98,
+    timestamp: Date.now() - 3 * 60000,
+    openedAt: Date.now() - 3 * 60000,
+    signalId: "xau_strat01_active",
+    reason: "[Strategy 01: Break & Retest] M15 Bullish Structure Breakout + M5 Support Retest to 4162.50 + M1 Rejection Wick Entry. Clearance to TP1 (4168.50) & TP2 (4174.50).",
+    stage: "RUNNING", // "RUNNING" | "CLOSED"
+    closeReason: null, // null | "TP2_HIT" | "SL_HIT"
+    tp1Hit: false,
+    tp1HitPrice: null,
+    tp1HitAt: null,
+    isReEntry: false,
+    reEnteredAt: null,
+  },
+  "01_BTCUSD": {
+    strategyNumber: "01",
+    strategyName: "Strategy 01: Breakout & Structural Retest (Price Action S/R)",
+    symbol: "BTCUSD",
+    status: "BUY",
+    trend: "BULLISH",
+    setup: "VALID_BULLISH_RETEST",
+    entry: 85900.0,
+    stopLoss: 85500.0,
+    tp1: 86300.0,
+    tp2: 86700.0,
+    riskReward: "1:2",
+    riskDistance: 400.0,
+    confidenceScore: 96,
+    timestamp: Date.now() - 5 * 60000,
+    openedAt: Date.now() - 5 * 60000,
+    signalId: "btc_strat01_active",
+    reason: "[Strategy 01: Break & Retest] S/R Breakout & Pullback Retest to 85900 support with Bullish Rejection wick.",
+    stage: "RUNNING",
+    closeReason: null,
+    tp1Hit: false,
+    tp1HitPrice: null,
+    tp1HitAt: null,
+    isReEntry: false,
+    reEnteredAt: null,
+  },
+  // Strategy 02: EMA Ribbon & Momentum Flow (Quant 9/21)
+  "02_XAUUSD": {
+    strategyNumber: "02",
+    strategyName: "Strategy 02: EMA Ribbon & Momentum Flow (Quant 9/21)",
+    symbol: "XAUUSD",
+    status: "BUY",
+    trend: "BULLISH",
+    setup: "EMA_RIBBON_ALIGNMENT",
+    entry: 4163.20,
+    stopLoss: 4158.00,
+    tp1: 4171.00,
+    tp2: 4178.80,
+    riskReward: "1:3",
+    riskDistance: 5.20,
+    confidenceScore: 95,
+    timestamp: Date.now() - 4 * 60000,
+    openedAt: Date.now() - 4 * 60000,
+    signalId: "xau_strat02_active",
+    reason: "[Strategy 02: EMA Ribbon] EMA9 crossed above EMA21 with expanding ribbon angle + RSI 58 (Bullish Momentum) + ATR expansion filter.",
+    stage: "RUNNING",
+    closeReason: null,
+    tp1Hit: false,
+    tp1HitPrice: null,
+    tp1HitAt: null,
+    isReEntry: false,
+    reEnteredAt: null,
+  },
+  "02_BTCUSD": {
+    strategyNumber: "02",
+    strategyName: "Strategy 02: EMA Ribbon & Momentum Flow (Quant 9/21)",
+    symbol: "BTCUSD",
+    status: "BUY",
+    trend: "BULLISH",
+    setup: "EMA_RIBBON_ALIGNMENT",
+    entry: 85950.0,
+    stopLoss: 85550.0,
+    tp1: 86550.0,
+    tp2: 87150.0,
+    riskReward: "1:3",
+    riskDistance: 400.0,
+    confidenceScore: 94,
+    timestamp: Date.now() - 6 * 60000,
+    openedAt: Date.now() - 6 * 60000,
+    signalId: "btc_strat02_active",
+    reason: "[Strategy 02: EMA Ribbon] Quant EMA Ribbon bullish fan out + RSI divergence confirmed + ATR volatility expansion.",
+    stage: "RUNNING",
+    closeReason: null,
+    tp1Hit: false,
+    tp1HitPrice: null,
+    tp1HitAt: null,
+    isReEntry: false,
+    reEnteredAt: null,
+  },
+  // Strategy 03: ICT SMC Liquidity Sweep & Order Block FVG
+  "03_XAUUSD": {
+    strategyNumber: "03",
+    strategyName: "Strategy 03: ICT SMC Liquidity Sweep & Order Block FVG",
+    symbol: "XAUUSD",
+    status: "BUY",
+    trend: "BULLISH",
+    setup: "SMC_LIQUIDITY_SWEEP",
+    entry: 4161.80,
+    stopLoss: 4155.50,
+    tp1: 4171.25,
+    tp2: 4180.70,
+    riskReward: "1:3",
+    riskDistance: 6.30,
+    confidenceScore: 97,
+    timestamp: Date.now() - 2 * 60000,
+    openedAt: Date.now() - 2 * 60000,
+    signalId: "xau_strat03_active",
+    reason: "[Strategy 03: ICT SMC] Asian Session Low Liquidity Purged (Sweep Wick) + Bullish Order Block tapped + Fair Value Gap (FVG) filled at 4161.80.",
+    stage: "RUNNING",
+    closeReason: null,
+    tp1Hit: false,
+    tp1HitPrice: null,
+    tp1HitAt: null,
+    isReEntry: false,
+    reEnteredAt: null,
+  },
+  "03_BTCUSD": {
+    strategyNumber: "03",
+    strategyName: "Strategy 03: ICT SMC Liquidity Sweep & Order Block FVG",
+    symbol: "BTCUSD",
+    status: "BUY",
+    trend: "BULLISH",
+    setup: "SMC_LIQUIDITY_SWEEP",
+    entry: 85850.0,
+    stopLoss: 85400.0,
+    tp1: 86525.0,
+    tp2: 87200.0,
+    riskReward: "1:3",
+    riskDistance: 450.0,
+    confidenceScore: 96,
+    timestamp: Date.now() - 4 * 60000,
+    openedAt: Date.now() - 4 * 60000,
+    signalId: "btc_strat03_active",
+    reason: "[Strategy 03: ICT SMC] Sell-side Liquidity (SSL) raid below swing low + Immediate displacement bullish impulse leaving Fair Value Gap.",
+    stage: "RUNNING",
+    closeReason: null,
+    tp1Hit: false,
+    tp1HitPrice: null,
+    tp1HitAt: null,
+    isReEntry: false,
+    reEnteredAt: null,
+  },
+  // Legacy Aliases
   XAUUSD: {
+    strategyNumber: "01",
     symbol: "XAUUSD",
     status: "BUY",
     trend: "BULLISH",
@@ -30,8 +204,8 @@ const DEFAULT_ACTIVE_POSITIONS = {
     openedAt: Date.now() - 3 * 60000,
     signalId: "xau_live_buy_active",
     reason: "M15 Bullish Trend (Higher Highs) + M5 Pullback Retest to EMA20 + M3 Momentum Displacement Trigger. Clear structural clearance to TP1 & TP2 (OANDA:XAUUSD Benchmark).",
-    stage: "RUNNING", // "RUNNING" | "CLOSED"
-    closeReason: null, // null | "TP2_HIT" | "SL_HIT"
+    stage: "RUNNING",
+    closeReason: null,
     tp1Hit: false,
     tp1HitPrice: null,
     tp1HitAt: null,
@@ -39,6 +213,7 @@ const DEFAULT_ACTIVE_POSITIONS = {
     reEnteredAt: null,
   },
   BTCUSD: {
+    strategyNumber: "01",
     symbol: "BTCUSD",
     status: "BUY",
     trend: "BULLISH",
@@ -54,8 +229,8 @@ const DEFAULT_ACTIVE_POSITIONS = {
     openedAt: Date.now() - 5 * 60000,
     signalId: "btc_active_buy",
     reason: "M15 Bullish Structure + M5 Pullback Retest + M3 Momentum Trigger (BINANCE:BTCUSDT Benchmark)",
-    stage: "RUNNING", // "RUNNING" | "CLOSED"
-    closeReason: null, // null | "TP2_HIT" | "SL_HIT"
+    stage: "RUNNING",
+    closeReason: null,
     tp1Hit: false,
     tp1HitPrice: null,
     tp1HitAt: null,
@@ -113,6 +288,85 @@ function App() {
   const [showConfidenceModal, setShowConfidenceModal] = useState(false);
   const [userRole, setUserRole] = useState(() => localStorage.getItem("app_user_role") || "ADMIN");
   const [journalTab, setJournalTab] = useState("records"); // "records" | "scorecard"
+
+  // 3 Registered Trading Strategies State (01, 02, 03)
+  const [selectedStrategyNumber, setSelectedStrategyNumber] = useState(() => {
+    try {
+      return localStorage.getItem(STORAGE_KEY_ACTIVE_STRATEGY) || "01";
+    } catch (e) {
+      return "01";
+    }
+  });
+
+  const [strategySounds, setStrategySounds] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_STRATEGY_SOUND);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return DEFAULT_STRATEGY_SOUNDS;
+  });
+
+  // Recent candles cache for strategy live evaluation
+  const [marketCandles, setMarketCandles] = useState({
+    XAUUSD: [],
+    BTCUSD: [],
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_STRATEGY_SOUND, JSON.stringify(strategySounds));
+    } catch (e) {}
+  }, [strategySounds]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_ACTIVE_STRATEGY, selectedStrategyNumber);
+    } catch (e) {}
+  }, [selectedStrategyNumber]);
+
+  const handleToggleStrategySound = (strategyNum) => {
+    setStrategySounds((prev) => {
+      const nextVal = !prev[strategyNum];
+      const updated = { ...prev, [strategyNum]: nextVal };
+      if (nextVal) {
+        playSignalChime(); // Audible chime feedback on enabling sound
+      }
+      try {
+        localStorage.setItem(STORAGE_KEY_STRATEGY_SOUND, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  };
+
+  const handleSelectStrategy = (num) => {
+    setSelectedStrategyNumber(num);
+    try {
+      localStorage.setItem(STORAGE_KEY_ACTIVE_STRATEGY, num);
+    } catch (e) {}
+  };
+
+  // Lot Size State (Persisted)
+  const [selectedLotSize, setSelectedLotSize] = useState(() => {
+    try {
+      return localStorage.getItem("master_ai_selected_lot_size_v2") || "0.10";
+    } catch (e) {
+      return "0.10";
+    }
+  });
+  const [lotModalOpen, setLotModalOpen] = useState(false);
+  const [customLotInput, setCustomLotInput] = useState("");
+
+  const handleSelectLotSize = (val) => {
+    const num = parseFloat(String(val));
+    if (Number.isFinite(num) && num > 0) {
+      const formatted = num.toFixed(2);
+      setSelectedLotSize(formatted);
+      setLotModalOpen(false);
+      try {
+        localStorage.setItem("master_ai_selected_lot_size_v2", formatted);
+      } catch (e) {}
+    }
+  };
 
   useEffect(() => {
     localStorage.setItem("app_user_role", userRole);
@@ -382,127 +636,161 @@ function App() {
       let changed = false;
       const next = { ...prev };
 
-      for (const sym of MARKETS) {
-        const pos = next[sym];
-        const price = marketPrices[sym];
-        if (!pos || !price || !pos.entry || !pos.stopLoss || !pos.tp1 || !pos.tp2) continue;
+      // Process all active positions across all strategies
+      for (const [key, pos] of Object.entries(next)) {
+        if (!pos || typeof pos !== "object") continue;
+        const sym = pos.symbol || (key.includes("BTC") ? "BTCUSD" : "XAUUSD");
+        const rawPrice = marketPrices[sym];
+        if (rawPrice === undefined || rawPrice === null) continue;
+
+        const stratNum = pos.strategyNumber || key.slice(0, 2) || selectedStrategyNumber;
+        const isSoundOn = Boolean(strategySounds[stratNum]);
+
+        // Type Safety & Data Parsing with parseFloat
+        const liveMarketPrice = parseFloat(String(rawPrice));
+        const entry = parseFloat(String(pos.entry));
+        const sl = parseFloat(String(pos.stopLoss));
+        const tp1 = parseFloat(String(pos.tp1));
+        const tp2 = parseFloat(String(pos.tp2));
+
+        if (
+          !Number.isFinite(liveMarketPrice) ||
+          !Number.isFinite(entry) ||
+          !Number.isFinite(sl) ||
+          !Number.isFinite(tp1) ||
+          !Number.isFinite(tp2)
+        ) {
+          continue;
+        }
 
         const isBuy = pos.status === "BUY";
-        const entry = Number(pos.entry);
-        const sl = Number(pos.stopLoss);
-        const tp1 = Number(pos.tp1);
-        const tp2 = Number(pos.tp2);
+        const isSell = pos.status === "SELL";
+        if (!isBuy && !isSell) continue;
+
         // Small threshold buffer to avoid missed ticks (0.20 for XAUUSD, 15.0 for BTCUSD)
         const reEntryBuffer = sym === "XAUUSD" ? 0.20 : 15.0;
 
+        // Normalize legacy closed states if present
+        const isCurrentlyClosed =
+          pos.stage === "CLOSED" ||
+          pos.stage === "CLOSED_TP2" ||
+          pos.stage === "CLOSED_SL";
+
         // -----------------------------------------------------------------
         // RULE 3: RE-ENTRY RE-ACTIVATION (Back to Active State)
-        // Once a position is marked as CLOSED, monitor liveMarketPrice.
+        // Once a position is marked as CLOSED, keep monitoring liveMarketPrice.
         // If liveMarketPrice returns to equal Entry (within threshold buffer),
         // reactivate position status back to RUNNING!
         // -----------------------------------------------------------------
-        if (pos.stage === "CLOSED") {
-          const distToEntry = Math.abs(price - entry);
+        if (isCurrentlyClosed) {
+          const distToEntry = Math.abs(liveMarketPrice - entry);
           if (distToEntry <= reEntryBuffer) {
-            next[sym] = {
+            next[key] = {
               ...pos,
               stage: "RUNNING",
               closeReason: null,
               isReEntry: true,
               tp1Hit: false,
+              tp1HitPrice: null,
+              tp1HitAt: null,
               reEnteredAt: Date.now(),
-              reEntryPrice: price,
+              reEntryPrice: liveMarketPrice,
               closedPrice: null,
               closedAt: null,
               result: null,
             };
             changed = true;
-            playSignalChime();
+            if (isSoundOn) playSignalChime();
+          } else if (pos.stage !== "CLOSED") {
+            next[key] = {
+              ...pos,
+              stage: "CLOSED",
+            };
+            changed = true;
           }
-          // While closed, skip TP/SL triggers until reactivated
           continue;
         }
 
         // -----------------------------------------------------------------
         // RULE 1 & 2: RUNNING STATE & TRANSITION TO CLOSED
         // -----------------------------------------------------------------
-        if (pos.stage === "RUNNING") {
+        if (pos.stage === "RUNNING" || !pos.stage) {
           if (isBuy) {
             // BUY RULES:
             // 2. CLOSED: If liveMarketPrice >= TP2 OR liveMarketPrice <= SL
-            if (price >= tp2) {
-              next[sym] = {
+            if (liveMarketPrice >= tp2) {
+              next[key] = {
                 ...pos,
                 stage: "CLOSED",
                 closeReason: "TP2_HIT",
-                closedPrice: price,
+                closedPrice: liveMarketPrice,
                 closedAt: Date.now(),
                 result: "WIN_TP2",
               };
               changed = true;
-              playSignalChime();
-            } else if (price <= sl) {
-              next[sym] = {
+              if (isSoundOn) playSignalChime();
+            } else if (liveMarketPrice <= sl) {
+              next[key] = {
                 ...pos,
                 stage: "CLOSED",
                 closeReason: "SL_HIT",
-                closedPrice: price,
+                closedPrice: liveMarketPrice,
                 closedAt: Date.now(),
                 result: "LOSS_SL",
               };
               changed = true;
-              playNewsWarningTone();
+              if (isSoundOn) playNewsWarningTone();
             } else {
               // 1. RUNNING: between Entry and TP2 (inclusive of TP1 hit)
-              // When liveMarketPrice >= TP1, set tp1Hit = true while remaining RUNNING
-              if (price >= tp1 && !pos.tp1Hit) {
-                next[sym] = {
+              if (liveMarketPrice >= tp1 && !pos.tp1Hit) {
+                next[key] = {
                   ...pos,
+                  stage: "RUNNING",
                   tp1Hit: true,
-                  tp1HitPrice: price,
+                  tp1HitPrice: liveMarketPrice,
                   tp1HitAt: Date.now(),
                 };
                 changed = true;
-                playSignalChime();
+                if (isSoundOn) playSignalChime();
               }
             }
-          } else {
+          } else if (isSell) {
             // SELL RULES:
             // 2. CLOSED: If liveMarketPrice <= TP2 OR liveMarketPrice >= SL
-            if (price <= tp2) {
-              next[sym] = {
+            if (liveMarketPrice <= tp2) {
+              next[key] = {
                 ...pos,
                 stage: "CLOSED",
                 closeReason: "TP2_HIT",
-                closedPrice: price,
+                closedPrice: liveMarketPrice,
                 closedAt: Date.now(),
                 result: "WIN_TP2",
               };
               changed = true;
-              playSignalChime();
-            } else if (price >= sl) {
-              next[sym] = {
+              if (isSoundOn) playSignalChime();
+            } else if (liveMarketPrice <= sl) {
+              next[key] = {
                 ...pos,
                 stage: "CLOSED",
                 closeReason: "SL_HIT",
-                closedPrice: price,
+                closedPrice: liveMarketPrice,
                 closedAt: Date.now(),
                 result: "LOSS_SL",
               };
               changed = true;
-              playNewsWarningTone();
+              if (isSoundOn) playNewsWarningTone();
             } else {
               // 1. RUNNING: between Entry and TP2 (inclusive of TP1 hit)
-              // When liveMarketPrice <= TP1, set tp1Hit = true while remaining RUNNING
-              if (price <= tp1 && !pos.tp1Hit) {
-                next[sym] = {
+              if (liveMarketPrice <= tp1 && !pos.tp1Hit) {
+                next[key] = {
                   ...pos,
+                  stage: "RUNNING",
                   tp1Hit: true,
-                  tp1HitPrice: price,
+                  tp1HitPrice: liveMarketPrice,
                   tp1HitAt: Date.now(),
                 };
                 changed = true;
-                playSignalChime();
+                if (isSoundOn) playSignalChime();
               }
             }
           }
@@ -511,45 +799,54 @@ function App() {
 
       return changed ? next : prev;
     });
-  }, [marketPrices]);
+  }, [marketPrices, strategySounds, selectedStrategyNumber]);
 
   const handleClosePosition = (sym, reason = "MANUAL_CLOSE") => {
     setActivePositions((prev) => {
-      const pos = prev[sym];
+      const posKey = `${selectedStrategyNumber}_${sym}`;
+      const pos = prev[posKey] || prev[sym];
       if (!pos) return prev;
+      const closed = {
+        ...pos,
+        stage: "CLOSED",
+        closeReason: reason,
+        closedPrice: marketPrices[sym] || pos.entry,
+        closedAt: Date.now(),
+      };
       return {
         ...prev,
-        [sym]: {
-          ...pos,
-          stage: "CLOSED",
-          closeReason: reason,
-          closedPrice: marketPrices[sym] || pos.entry,
-          closedAt: Date.now(),
-        },
+        [posKey]: closed,
+        [sym]: closed,
       };
     });
   };
 
   const handleManualReEntry = (sym) => {
     setActivePositions((prev) => {
-      const pos = prev[sym];
+      const posKey = `${selectedStrategyNumber}_${sym}`;
+      const pos = prev[posKey] || prev[sym];
       if (!pos) return prev;
+      const reEntered = {
+        ...pos,
+        stage: "RUNNING",
+        closeReason: null,
+        isReEntry: true,
+        tp1Hit: false,
+        reEnteredAt: Date.now(),
+        reEntryPrice: marketPrices[sym] || pos.entry,
+        closedPrice: null,
+        closedAt: null,
+      };
       return {
         ...prev,
-        [sym]: {
-          ...pos,
-          stage: "RUNNING",
-          closeReason: null,
-          isReEntry: true,
-          tp1Hit: false,
-          reEnteredAt: Date.now(),
-          reEntryPrice: marketPrices[sym] || pos.entry,
-          closedPrice: null,
-          closedAt: null,
-        },
+        [posKey]: reEntered,
+        [sym]: reEntered,
       };
     });
-    playSignalChime();
+    const soundOn = Boolean(strategySounds[selectedStrategyNumber]);
+    if (soundOn) {
+      playSignalChime();
+    }
   };
 
   const simulatePriceMove = (sym, targetPrice) => {
@@ -596,6 +893,11 @@ function App() {
         XAUUSD: xauReport,
         BTCUSD: btcReport,
       });
+
+      setMarketCandles({
+        XAUUSD: xauM5 || [],
+        BTCUSD: btcM5 || [],
+      });
     } catch (e) {
       console.warn("Unified MTF Report load error:", e);
     }
@@ -608,19 +910,34 @@ function App() {
   }, [loadMtfBacktest]);
 
   const livePrice = marketPrices[market];
-  const activePos = activePositions[market];
-  const currentSignal = activePos || engineSignals[market];
-  const isActivePosition = !!activePos;
+  const activeStrategy = getStrategyByNumber(selectedStrategyNumber);
+  const positionKey = `${selectedStrategyNumber}_${market}`;
+  const activePos = activePositions[positionKey] || (activePositions[market]?.strategyNumber === selectedStrategyNumber ? activePositions[market] : null);
+  const candlesForMarket = marketCandles[market] || [];
+  const activeEvaluation = activeStrategy.evaluate(market, candlesForMarket, livePrice);
+  const currentSignal = activePos || activeEvaluation || engineSignals[market];
+  const isActivePosition = Boolean(activePos);
   const isWait = !isActivePosition && currentSignal?.status === "WAIT";
   const sideClass = getSideClass(currentSignal?.status);
 
-  // Single Source of Truth for BOTH Backtest Page AND Journal Page!
+  // Strategy-Dedicated Journal Report (Strictly isolated per strategy & lot size)
   const currentReport = useMemo(() => {
-    return (
-      unifiedReports[market] ||
-      runUnifiedMTFEngine(market, [], [], [], livePrice)
+    return generateStrategyJournalReport(
+      selectedStrategyNumber,
+      market,
+      livePrice,
+      selectedLotSize
     );
-  }, [unifiedReports, market, livePrice]);
+  }, [selectedStrategyNumber, market, livePrice, selectedLotSize]);
+
+  // Strategy Comparison Matrix (01 vs 02 vs 03 side-by-side)
+  const comparisonReport = useMemo(() => {
+    return generateAllStrategiesComparison(
+      market,
+      livePrice,
+      selectedLotSize
+    );
+  }, [market, livePrice, selectedLotSize]);
 
   // Market Switch Bar Component
   const renderMarketSwitch = () => (
@@ -644,6 +961,409 @@ function App() {
       })}
     </section>
   );
+
+  // REUSABLE STRATEGY SWITCHER BAR WITH SEQUENTIAL 01, 02, 03, SOUND TOGGLE & LOT SIZE BUTTON
+  const renderStrategySwitcherBar = (pageContext = "home") => {
+    const isGold = market === "XAUUSD";
+    const dollarPerPt = isGold
+      ? (parseFloat(selectedLotSize) * 10).toFixed(2)
+      : (parseFloat(selectedLotSize) * 0.10).toFixed(2);
+
+    return (
+      <div style={{ marginBottom: "14px" }}>
+        {/* Header Row: Strategy Selection & Lot Size Picker Button */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "8px",
+            marginBottom: "8px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span
+              className="eyebrow"
+              style={{
+                fontSize: "0.72rem",
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: "#94a3b8",
+              }}
+            >
+              SELECT TRADING STRATEGY (ជ្រើសរើសយុទ្ធសាស្ត្រ)
+            </span>
+            <span
+              style={{
+                fontSize: "0.65rem",
+                padding: "2px 6px",
+                borderRadius: "4px",
+                background: "rgba(56, 189, 248, 0.15)",
+                color: "#38bdf8",
+                fontWeight: 700,
+                border: "1px solid rgba(56, 189, 248, 0.3)",
+              }}
+            >
+              {activeStrategy.shortName}
+            </span>
+          </div>
+
+          {/* BUTTON ជ្រើសរើស LOT SIZE */}
+          <button
+            onClick={() => setLotModalOpen(true)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "6px 12px",
+              borderRadius: "8px",
+              background: "linear-gradient(135deg, rgba(245, 158, 11, 0.22) 0%, rgba(217, 119, 6, 0.14) 100%)",
+              border: "1px solid rgba(245, 158, 11, 0.5)",
+              color: "#fbbf24",
+              fontSize: "0.74rem",
+              fontWeight: 800,
+              cursor: "pointer",
+              boxShadow: "0 0 10px rgba(245, 158, 11, 0.2)",
+              transition: "all 0.18s ease",
+            }}
+            title="ចុចដើម្បីជ្រើសរើសទំហំ Lot Size (0.01 – 1.00 Lot)"
+          >
+            <span>📊</span>
+            <span>Lot: <strong>{selectedLotSize} Lot</strong></span>
+            <span style={{ fontSize: "0.64rem", opacity: 0.9 }}>(${dollarPerPt}/pt)</span>
+            <span style={{ fontSize: "0.72rem" }}>▾</span>
+          </button>
+        </div>
+
+        {/* 3 SEQUENTIAL STRATEGY SWITCH TABS: 01, 02, 03 */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: "8px",
+            padding: "4px",
+            background: "rgba(15, 23, 42, 0.8)",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+            borderRadius: "12px",
+          }}
+        >
+          {registeredStrategies.map((strat) => {
+            const isActive = strat.number === selectedStrategyNumber;
+            const hasSound = Boolean(strategySounds[strat.number]);
+
+            return (
+              <div
+                key={strat.id}
+                onClick={() => handleSelectStrategy(strat.number)}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "4px",
+                  padding: "9px 6px",
+                  borderRadius: "10px",
+                  cursor: "pointer",
+                  border: isActive
+                    ? "1.5px solid #38bdf8"
+                    : "1px solid rgba(255, 255, 255, 0.05)",
+                  background: isActive
+                    ? "linear-gradient(180deg, rgba(56, 189, 248, 0.25) 0%, rgba(14, 165, 233, 0.12) 100%)"
+                    : "rgba(255, 255, 255, 0.02)",
+                  color: isActive ? "#f8fafc" : "#94a3b8",
+                  transition: "all 0.2s ease",
+                  boxShadow: isActive ? "0 0 14px rgba(56, 189, 248, 0.3)" : "none",
+                  position: "relative",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                  <span
+                    style={{
+                      fontSize: "0.68rem",
+                      padding: "1px 5px",
+                      borderRadius: "4px",
+                      background: isActive ? "#38bdf8" : "rgba(255, 255, 255, 0.1)",
+                      color: isActive ? "#000000" : "#94a3b8",
+                      fontWeight: 800,
+                    }}
+                  >
+                    {strat.number}
+                  </span>
+                  <span style={{ fontSize: "0.78rem", fontWeight: 700 }}>
+                    {strat.shortName.replace(/^\d+\s*•\s*/, "")}
+                  </span>
+                </div>
+
+                {/* Sound Alert Toggle Button directly on Strategy Card */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggleStrategySound(strat.number);
+                  }}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    padding: "2px 7px",
+                    borderRadius: "9999px",
+                    fontSize: "0.64rem",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    border: hasSound
+                      ? "1px solid rgba(34, 197, 94, 0.5)"
+                      : "1px solid rgba(100, 116, 139, 0.3)",
+                    background: hasSound
+                      ? "rgba(34, 197, 94, 0.2)"
+                      : "rgba(100, 116, 139, 0.15)",
+                    color: hasSound ? "#86efac" : "#94a3b8",
+                    transition: "all 0.15s ease",
+                  }}
+                  title={`ចុចដើម្បីបិទ/បើកសម្លេង Alert សម្រាប់ Strategy ${strat.number}`}
+                >
+                  <span>{hasSound ? "🔔 ON" : "🔕 OFF"}</span>
+                </button>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* QUICK LOT PILLS SELECTOR BAR */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "5px",
+            marginTop: "8px",
+            overflowX: "auto",
+            paddingBottom: "2px",
+            scrollbarWidth: "none",
+          }}
+        >
+          <span style={{ fontSize: "0.68rem", color: "#64748b", fontWeight: 700, flexShrink: 0 }}>
+            Lot Size:
+          </span>
+          {["0.01", "0.02", "0.05", "0.10", "0.20", "0.50", "1.00"].map((lot) => {
+            const isCur = selectedLotSize === lot;
+            return (
+              <button
+                key={lot}
+                onClick={() => handleSelectLotSize(lot)}
+                style={{
+                  padding: "3px 8px",
+                  borderRadius: "6px",
+                  fontSize: "0.68rem",
+                  fontWeight: isCur ? 800 : 600,
+                  cursor: "pointer",
+                  border: isCur
+                    ? "1px solid #fbbf24"
+                    : "1px solid rgba(255, 255, 255, 0.08)",
+                  background: isCur
+                    ? "rgba(245, 158, 11, 0.25)"
+                    : "rgba(255, 255, 255, 0.03)",
+                  color: isCur ? "#fbbf24" : "#94a3b8",
+                  transition: "all 0.15s ease",
+                  flexShrink: 0,
+                }}
+              >
+                {lot}{lot === "0.10" ? " (Std)" : ""}
+              </button>
+            );
+          })}
+          <button
+            onClick={() => setLotModalOpen(true)}
+            style={{
+              padding: "3px 8px",
+              borderRadius: "6px",
+              fontSize: "0.68rem",
+              fontWeight: 700,
+              cursor: "pointer",
+              border: "1px dashed rgba(245, 158, 11, 0.4)",
+              background: "transparent",
+              color: "#fbbf24",
+              flexShrink: 0,
+            }}
+          >
+            + Custom
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // FULL LOT SIZE MODAL SELECTOR
+  const renderLotSizeModal = () => {
+    if (!lotModalOpen) return null;
+    const isGold = market === "XAUUSD";
+
+    return (
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0, 0, 0, 0.75)",
+          backdropFilter: "blur(6px)",
+          zIndex: 9999,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "16px",
+        }}
+        onClick={() => setLotModalOpen(false)}
+      >
+        <div
+          style={{
+            background: "#0f172a",
+            border: "1px solid rgba(245, 158, 11, 0.45)",
+            borderRadius: "16px",
+            padding: "20px",
+            maxWidth: "420px",
+            width: "100%",
+            boxShadow: "0 20px 40px rgba(0, 0, 0, 0.6)",
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+            <div>
+              <span className="eyebrow" style={{ color: "#fbbf24", fontSize: "0.72rem" }}>
+                TRADE LOT SIZE SELECTOR
+              </span>
+              <h3 style={{ margin: "2px 0 0", color: "#f8fafc", fontSize: "1.15rem" }}>
+                ជ្រើសរើសទំហំ Lot Size
+              </h3>
+            </div>
+            <button
+              onClick={() => setLotModalOpen(false)}
+              style={{
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "none",
+                color: "#94a3b8",
+                width: "28px",
+                height: "28px",
+                borderRadius: "50%",
+                cursor: "pointer",
+                fontSize: "1rem",
+              }}
+            >
+              ✕
+            </button>
+          </div>
+
+          <p style={{ color: "#94a3b8", fontSize: "0.78rem", marginBottom: "14px", lineHeight: 1.5 }}>
+            ជ្រើសរើស Lot Size ដើម្បីគណនាប្រាក់ចំណេញ (PnL) ទាំងលើ Home Floating Trade និងគ្រប់ទិន្នន័យក្នុង Journal ទាំងអស់៖
+          </p>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "16px" }}>
+            {LOT_SIZE_OPTIONS.map((opt) => {
+              const isSelected = selectedLotSize === opt.value;
+              const dollarValue = isGold
+                ? (parseFloat(opt.value) * 10).toFixed(2)
+                : (parseFloat(opt.value) * 0.10).toFixed(2);
+
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => handleSelectLotSize(opt.value)}
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: "10px",
+                    border: isSelected
+                      ? "2px solid #fbbf24"
+                      : "1px solid rgba(255, 255, 255, 0.08)",
+                    background: isSelected
+                      ? "linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(217, 119, 6, 0.15) 100%)"
+                      : "rgba(255, 255, 255, 0.03)",
+                    color: isSelected ? "#fbbf24" : "#e2e8f0",
+                    textAlign: "left",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  <div style={{ fontSize: "0.88rem", fontWeight: 800 }}>
+                    {opt.value} Lot
+                  </div>
+                  <div style={{ fontSize: "0.68rem", color: isSelected ? "#fef08a" : "#64748b", marginTop: "2px" }}>
+                    1 pt = ${dollarValue}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Custom Lot Input */}
+          <div
+            style={{
+              padding: "12px",
+              background: "rgba(255, 255, 255, 0.02)",
+              border: "1px solid rgba(255, 255, 255, 0.06)",
+              borderRadius: "10px",
+              marginBottom: "14px",
+            }}
+          >
+            <span style={{ fontSize: "0.72rem", color: "#94a3b8", display: "block", marginBottom: "6px" }}>
+              ឬ បញ្ចូល Custom Lot Size ដោយខ្លួនឯង៖
+            </span>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                max="50.0"
+                placeholder="ឧទាហរណ៍៖ 0.25"
+                value={customLotInput}
+                onChange={(e) => setCustomLotInput(e.target.value)}
+                style={{
+                  flex: 1,
+                  padding: "8px 12px",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(245, 158, 11, 0.3)",
+                  background: "rgba(0, 0, 0, 0.4)",
+                  color: "#f8fafc",
+                  fontSize: "0.85rem",
+                  outline: "none",
+                }}
+              />
+              <button
+                onClick={() => {
+                  if (customLotInput) handleSelectLotSize(customLotInput);
+                }}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: "8px",
+                  background: "#fbbf24",
+                  color: "#000",
+                  fontWeight: 800,
+                  fontSize: "0.78rem",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                យល់ព្រម
+              </button>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setLotModalOpen(false)}
+            style={{
+              width: "100%",
+              padding: "10px",
+              borderRadius: "10px",
+              background: "rgba(255, 255, 255, 0.08)",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              color: "#cbd5e1",
+              fontSize: "0.82rem",
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            បិទផ្ទាំង (Close)
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   // Multi-Timeframe Status Hierarchy Pills
   const renderMtfStatusBar = () => {
@@ -694,13 +1414,17 @@ function App() {
   // PAGE 1: HOME
   // =========================================================================
   function renderHome() {
-    const activePos = activePositions[market];
-    const currentSignal = activePos || engineSignals[market];
+    const activeStrategy = getStrategyByNumber(selectedStrategyNumber);
+    const posKey = `${selectedStrategyNumber}_${market}`;
+    const activePos = activePositions[posKey] || (activePositions[market]?.strategyNumber === selectedStrategyNumber ? activePositions[market] : null);
+    const candlesForMarket = marketCandles[market] || [];
+    const activeEvaluation = activeStrategy.evaluate(market, candlesForMarket, livePrice);
+    const currentSignal = activePos || activeEvaluation || engineSignals[market];
     const isActivePosition = Boolean(activePos);
     const isWait = !isActivePosition && currentSignal?.status === "WAIT";
     const sideClass = getSideClass(currentSignal?.status);
 
-    const lotMultiplier = market === "XAUUSD" ? 1.0 : 0.01;
+    const lotMultiplier = getLotSizeMultiplier(selectedLotSize, market);
     const isBuy = currentSignal?.status === "BUY";
     const isSell = currentSignal?.status === "SELL";
 
@@ -783,7 +1507,54 @@ function App() {
     return (
       <>
         {renderMarketSwitch()}
+        {renderStrategySwitcherBar("home")}
         {renderMtfStatusBar()}
+
+        {/* Active Strategy Identity Banner */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "8px",
+            padding: "8px 12px",
+            background: "rgba(56, 189, 248, 0.08)",
+            border: "1px solid rgba(56, 189, 248, 0.3)",
+            borderRadius: "10px",
+            marginBottom: "12px",
+            fontSize: "0.75rem",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span
+              style={{
+                fontSize: "0.68rem",
+                fontWeight: 900,
+                padding: "2px 6px",
+                borderRadius: "4px",
+                background: "#38bdf8",
+                color: "#000",
+              }}
+            >
+              {activeStrategy.number}
+            </span>
+            <strong style={{ color: "#f8fafc" }}>
+              {activeStrategy.name}
+            </strong>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.7rem" }}>
+            <span style={{ color: "#fbbf24", fontWeight: 700 }}>
+              Lot: {selectedLotSize}
+            </span>
+            <span style={{ color: "#22c55e", fontWeight: 700 }}>
+              Win Rate: {activeStrategy.winRate}
+            </span>
+            <span style={{ color: "#38bdf8", fontWeight: 700 }}>
+              RR: {activeStrategy.defaultRR}
+            </span>
+          </div>
+        </div>
 
         {/* Live Engine Active Indicator */}
         <div
@@ -1018,27 +1789,47 @@ function App() {
             <div className="signal-top-right">
               {isActivePosition ? (
                 isRunning ? (
-                  /* Active: Green RUNNING badge */
-                  <div
-                    className="signal-status active-running-badge"
-                    style={{
-                      backgroundColor: "#22c55e",
-                      color: "#ffffff",
-                      borderRadius: "9999px",
-                      padding: "6px 14px",
-                      fontWeight: 700,
-                      letterSpacing: "0.04em",
-                      fontSize: "0.75rem",
-                      lineHeight: 1,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "6px",
-                      boxShadow: "0 0 12px rgba(34, 197, 94, 0.4)",
-                    }}
-                  >
-                    <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#fff", display: "inline-block" }} />
-                    {isReEntry ? "RE-ENTRY RUNNING" : "RUNNING"}
+                  /* Active: Green RUNNING badge with dynamic TP1 HIT indicator */
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    {isTp1Hit && (
+                      <span
+                        style={{
+                          backgroundColor: "rgba(56, 189, 248, 0.18)",
+                          color: "#38bdf8",
+                          border: "1px solid rgba(56, 189, 248, 0.45)",
+                          borderRadius: "9999px",
+                          padding: "5px 10px",
+                          fontWeight: 700,
+                          fontSize: "0.72rem",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                        }}
+                      >
+                        🎯 TP1 HIT
+                      </span>
+                    )}
+                    <div
+                      className="signal-status active-running-badge"
+                      style={{
+                        backgroundColor: "#22c55e",
+                        color: "#ffffff",
+                        borderRadius: "9999px",
+                        padding: "6px 14px",
+                        fontWeight: 700,
+                        letterSpacing: "0.04em",
+                        fontSize: "0.75rem",
+                        lineHeight: 1,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        boxShadow: "0 0 12px rgba(34, 197, 94, 0.4)",
+                      }}
+                    >
+                      <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#fff", display: "inline-block" }} />
+                      {isReEntry ? "RE-ENTRY RUNNING" : "RUNNING"}
+                    </div>
                   </div>
                 ) : (
                   /* Closed/Waiting: Red/Gray CLOSED (WAITING RE-ENTRY) badge. Green RUNNING badge REMOVED! */
@@ -1561,96 +2352,436 @@ function App() {
   }
 
   // =========================================================================
-  // PAGE 2: ANALYSIS
+  // PAGE 2: ANALYSIS (3 MODULAR STRATEGIES 01, 02, 03 & AUDIO ALERT CONTROLS)
   // =========================================================================
   function renderAnalysis() {
-    const config = SYMBOL_CONFIGS[market];
     const isGold = market === "XAUUSD";
+    const currentPrice = marketPrices[market];
+    const candlesForMarket = marketCandles[market] || [];
+
+    // Get Active Selected Strategy
+    const activeStrategy = getStrategyByNumber(selectedStrategyNumber);
+    const isSoundOn = Boolean(strategySounds[activeStrategy.number]);
+
+    // Live Evaluation of Active Strategy
+    const activeEvaluation = activeStrategy.evaluate(market, candlesForMarket, currentPrice);
 
     return (
       <section className="page-card">
         {renderMarketSwitch()}
+        {renderStrategySwitcherBar("analysis")}
         {renderMtfStatusBar()}
-        <span className="eyebrow">TECHNICAL STRUCTURE ANALYSIS — {market}</span>
-        <h2>M15 / M5 / M3 Engine Diagnostics</h2>
-        <p style={{ color: "#94a3b8", fontSize: "0.85rem", marginBottom: "16px" }}>
-          ការវិភាគរចនាសម្ព័ន្ធទីផ្សារ Price Action & Market Structure ផ្ទាល់សម្រាប់ <strong>{market}</strong>៖
-        </p>
 
-        <div className="analysis-list">
-          <div style={{ padding: "14px", background: "rgba(255, 255, 255, 0.03)", borderRadius: "12px", marginBottom: "10px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <strong style={{ color: "#38bdf8", fontSize: "0.95rem" }}>1. M15 Trend Engine</strong>
-              <span
+        {/* ------------------------------------------------------------- */}
+        {/* ACTIVE STRATEGY CARD (WITH PER-STRATEGY SOUND TOGGLE)         */}
+        {/* ------------------------------------------------------------- */}
+        <div
+          style={{
+            background: "rgba(18, 25, 42, 0.85)",
+            border: "1px solid rgba(56, 189, 248, 0.28)",
+            borderRadius: "14px",
+            padding: "16px",
+            marginBottom: "16px",
+            boxShadow: "0 4px 20px rgba(0, 0, 0, 0.35)",
+          }}
+        >
+          {/* Header & Sound Toggle Button */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              flexWrap: "wrap",
+              gap: "10px",
+              paddingBottom: "12px",
+              borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+            }}
+          >
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                <span
+                  style={{
+                    fontSize: "0.72rem",
+                    padding: "3px 8px",
+                    borderRadius: "6px",
+                    background: "rgba(56, 189, 248, 0.2)",
+                    color: "#38bdf8",
+                    fontWeight: 800,
+                    letterSpacing: "0.04em",
+                    border: "1px solid rgba(56, 189, 248, 0.4)",
+                  }}
+                >
+                  STRATEGY {activeStrategy.number}
+                </span>
+                <span style={{ fontSize: "0.72rem", color: "#64748b", fontWeight: 600 }}>
+                  {activeStrategy.category}
+                </span>
+              </div>
+              <h2
                 style={{
-                  fontSize: "0.72rem",
-                  padding: "2px 8px",
-                  borderRadius: "6px",
-                  background: currentSignal?.trend === "BULLISH" ? "rgba(34, 197, 94, 0.2)" : currentSignal?.trend === "BEARISH" ? "rgba(239, 68, 68, 0.2)" : "rgba(234, 179, 8, 0.2)",
-                  color: currentSignal?.trend === "BULLISH" ? "#22c55e" : currentSignal?.trend === "BEARISH" ? "#ef4444" : "#eab308",
-                  fontWeight: 700,
+                  fontSize: "1.18rem",
+                  fontWeight: 800,
+                  color: "#f8fafc",
+                  margin: "4px 0 2px",
+                  lineHeight: 1.25,
                 }}
               >
-                {currentSignal?.trend}
+                {activeStrategy.name}
+              </h2>
+              <div style={{ display: "flex", gap: "6px", marginTop: "6px" }}>
+                {activeStrategy.timeframes.map((tf) => (
+                  <span
+                    key={tf}
+                    style={{
+                      fontSize: "0.65rem",
+                      padding: "2px 6px",
+                      borderRadius: "4px",
+                      background: "rgba(255, 255, 255, 0.06)",
+                      color: "#94a3b8",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {tf}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* BUTTON បិទ/បើកសម្លេង ALERT លើ STRATEGY នេះ */}
+            <button
+              onClick={() => handleToggleStrategySound(activeStrategy.number)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "7px",
+                padding: "8px 14px",
+                borderRadius: "9999px",
+                fontSize: "0.76rem",
+                fontWeight: 800,
+                cursor: "pointer",
+                background: isSoundOn
+                  ? "linear-gradient(135deg, rgba(34, 197, 94, 0.25) 0%, rgba(22, 163, 74, 0.15) 100%)"
+                  : "rgba(100, 116, 139, 0.15)",
+                border: isSoundOn
+                  ? "1px solid rgba(34, 197, 94, 0.5)"
+                  : "1px solid rgba(100, 116, 139, 0.35)",
+                color: isSoundOn ? "#86efac" : "#94a3b8",
+                boxShadow: isSoundOn ? "0 0 12px rgba(34, 197, 94, 0.35)" : "none",
+                transition: "all 0.2s ease",
+              }}
+              title="ចុចដើម្បីបិទ ឬ បើកសម្លេង Alert សម្រាប់ Strategy នេះ"
+            >
+              <span style={{ fontSize: "0.95rem" }}>{isSoundOn ? "🔔" : "🔕"}</span>
+              <span>{isSoundOn ? "សម្លេង Alert: បើក (ON)" : "សម្លេង Alert: បិទ (OFF)"}</span>
+              <span
+                style={{
+                  width: "7px",
+                  height: "7px",
+                  borderRadius: "50%",
+                  background: isSoundOn ? "#22c55e" : "#64748b",
+                  boxShadow: isSoundOn ? "0 0 6px #22c55e" : "none",
+                }}
+              />
+            </button>
+          </div>
+
+          {/* Live Evaluation Box for Current Market */}
+          <div
+            style={{
+              marginTop: "14px",
+              padding: "12px",
+              background: "rgba(15, 23, 42, 0.65)",
+              border: "1px solid rgba(255, 255, 255, 0.06)",
+              borderRadius: "10px",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
+                  Live Signal សម្រាប់ <strong>{market}</strong> ({formatPrice(currentPrice)})៖
+                </span>
+                <span
+                  style={{
+                    fontSize: "0.74rem",
+                    fontWeight: 800,
+                    padding: "3px 10px",
+                    borderRadius: "6px",
+                    background:
+                      activeEvaluation.side === "BUY"
+                        ? "rgba(34, 197, 94, 0.2)"
+                        : activeEvaluation.side === "SELL"
+                        ? "rgba(239, 68, 68, 0.2)"
+                        : "rgba(234, 179, 8, 0.2)",
+                    color:
+                      activeEvaluation.side === "BUY"
+                        ? "#22c55e"
+                        : activeEvaluation.side === "SELL"
+                        ? "#ef4444"
+                        : "#eab308",
+                    border:
+                      activeEvaluation.side === "BUY"
+                        ? "1px solid rgba(34, 197, 94, 0.4)"
+                        : activeEvaluation.side === "SELL"
+                        ? "1px solid rgba(239, 68, 68, 0.4)"
+                        : "1px solid rgba(234, 179, 8, 0.4)",
+                  }}
+                >
+                  {activeEvaluation.side}
+                </span>
+              </div>
+
+              <span style={{ fontSize: "0.7rem", color: "#38bdf8", fontWeight: 700 }}>
+                Win Rate: {activeStrategy.winRate} • RR {activeStrategy.defaultRR}
               </span>
             </div>
-            <p style={{ fontSize: "0.78rem", color: "#94a3b8", margin: "6px 0 0" }}>
-              {currentSignal?.debug?.m15.reason || "Analyzing M15 Higher Highs / Higher Lows structure"}
+
+            {/* Entry, SL, TP Grid */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(4, 1fr)",
+                gap: "8px",
+                marginBottom: "10px",
+                textAlign: "center",
+              }}
+            >
+              <div style={{ padding: "8px", background: "rgba(255, 255, 255, 0.03)", borderRadius: "8px" }}>
+                <span style={{ fontSize: "0.65rem", color: "#64748b", display: "block" }}>ENTRY</span>
+                <strong style={{ fontSize: "0.85rem", color: "#f8fafc" }}>{formatPrice(activeEvaluation.entry)}</strong>
+              </div>
+              <div style={{ padding: "8px", background: "rgba(255, 255, 255, 0.03)", borderRadius: "8px" }}>
+                <span style={{ fontSize: "0.65rem", color: "#64748b", display: "block" }}>STOP LOSS</span>
+                <strong style={{ fontSize: "0.85rem", color: "#ef4444" }}>{formatPrice(activeEvaluation.sl)}</strong>
+              </div>
+              <div style={{ padding: "8px", background: "rgba(255, 255, 255, 0.03)", borderRadius: "8px" }}>
+                <span style={{ fontSize: "0.65rem", color: "#64748b", display: "block" }}>TP1</span>
+                <strong style={{ fontSize: "0.85rem", color: "#38bdf8" }}>{formatPrice(activeEvaluation.tp1)}</strong>
+              </div>
+              <div style={{ padding: "8px", background: "rgba(255, 255, 255, 0.03)", borderRadius: "8px" }}>
+                <span style={{ fontSize: "0.65rem", color: "#64748b", display: "block" }}>TP2</span>
+                <strong style={{ fontSize: "0.85rem", color: "#22c55e" }}>{formatPrice(activeEvaluation.tp2)}</strong>
+              </div>
+            </div>
+
+            <p style={{ fontSize: "0.78rem", color: "#cbd5e1", margin: 0, lineHeight: 1.45 }}>
+              {activeEvaluation.reason}
             </p>
           </div>
 
-          <div style={{ padding: "14px", background: "rgba(255, 255, 255, 0.03)", borderRadius: "12px", marginBottom: "10px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <strong style={{ color: "#38bdf8", fontSize: "0.95rem" }}>2. M5 Setup Engine</strong>
-              <span
-                style={{
-                  fontSize: "0.72rem",
-                  padding: "2px 8px",
-                  borderRadius: "6px",
-                  background: String(currentSignal?.setup || "").includes("VALID") ? "rgba(34, 197, 94, 0.2)" : "rgba(100, 116, 139, 0.2)",
-                  color: String(currentSignal?.setup || "").includes("VALID") ? "#22c55e" : "#94a3b8",
-                  fontWeight: 700,
-                }}
-              >
-                {currentSignal?.setup || "NO_TREND"}
-              </span>
+          {/* Strategy Execution Rules */}
+          <div
+            style={{
+              marginTop: "12px",
+              padding: "10px 12px",
+              background: "rgba(255, 255, 255, 0.02)",
+              border: "1px dashed rgba(255, 255, 255, 0.1)",
+              borderRadius: "10px",
+              fontSize: "0.74rem",
+              color: "#94a3b8",
+              lineHeight: 1.5,
+            }}
+          >
+            <div>• <strong>ក្បួន Entry៖</strong> {activeStrategy.rules.entryRule}</div>
+            <div>• <strong>ក្បួន Stop Loss៖</strong> {activeStrategy.rules.slRule}</div>
+            <div>• <strong>ក្បួន Take Profit៖</strong> {activeStrategy.rules.tpRule}</div>
+          </div>
+        </div>
+
+        {/* ------------------------------------------------------------- */}
+        {/* 3. DIAGNOSTICS CHECKLIST FOR ACTIVE STRATEGY                  */}
+        {/* ------------------------------------------------------------- */}
+        <span className="eyebrow">DIAGNOSTIC ENGINE BREAKDOWN — STRATEGY {activeStrategy.number}</span>
+        <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "#f8fafc", margin: "4px 0 12px" }}>
+          ការវិភាគបច្ចេកទេសលម្អិត ({activeStrategy.shortName})
+        </h3>
+
+        <div className="analysis-list" style={{ marginBottom: "20px" }}>
+          {activeEvaluation.diagnostics?.map((diag, idx) => (
+            <div
+              key={idx}
+              style={{
+                padding: "12px 14px",
+                background: "rgba(255, 255, 255, 0.03)",
+                borderRadius: "12px",
+                marginBottom: "8px",
+                border: "1px solid rgba(255, 255, 255, 0.04)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <strong style={{ color: "#38bdf8", fontSize: "0.88rem" }}>{diag.title}</strong>
+                <span
+                  style={{
+                    fontSize: "0.7rem",
+                    padding: "2px 8px",
+                    borderRadius: "6px",
+                    background:
+                      diag.statusColor === "#22c55e"
+                        ? "rgba(34, 197, 94, 0.2)"
+                        : diag.statusColor === "#ef4444"
+                        ? "rgba(239, 68, 68, 0.2)"
+                        : "rgba(56, 189, 248, 0.2)",
+                    color: diag.statusColor || "#38bdf8",
+                    fontWeight: 800,
+                  }}
+                >
+                  {diag.status}
+                </span>
+              </div>
+              <p style={{ fontSize: "0.78rem", color: "#94a3b8", margin: "6px 0 0", lineHeight: 1.45 }}>
+                {diag.description}
+              </p>
             </div>
-            <p style={{ fontSize: "0.78rem", color: "#94a3b8", margin: "6px 0 0" }}>
-              {currentSignal?.debug?.m5.reason || "Awaiting Breakout + Retest alignment on M5"}
-            </p>
+          ))}
+        </div>
+
+        {/* ------------------------------------------------------------- */}
+        {/* 4. ALL 3 STRATEGIES COMPARATIVE MATRIX (01, 02, 03)           */}
+        {/* ------------------------------------------------------------- */}
+        <div style={{ marginTop: "24px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+            <span
+              className="eyebrow"
+              style={{
+                fontSize: "0.72rem",
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: "#64748b",
+              }}
+            >
+              ALL 3 STRATEGIES (យុទ្ធសាស្ត្រទាំង 3 ក្នុងប្រព័ន្ធ)
+            </span>
+            <span style={{ fontSize: "0.68rem", color: "#22c55e", fontWeight: 700 }}>
+              ចុចប្តូរ ឬ បិទ/បើកសម្លេង Alert
+            </span>
           </div>
 
-          <div style={{ padding: "14px", background: "rgba(255, 255, 255, 0.03)", borderRadius: "12px", marginBottom: "10px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <strong style={{ color: "#38bdf8", fontSize: "0.95rem" }}>3. M3 Entry Confirmation</strong>
-              <span
-                style={{
-                  fontSize: "0.72rem",
-                  padding: "2px 8px",
-                  borderRadius: "6px",
-                  background: currentSignal?.debug?.m3.isConfirmed ? "rgba(34, 197, 94, 0.2)" : "rgba(100, 116, 139, 0.2)",
-                  color: currentSignal?.debug?.m3.isConfirmed ? "#22c55e" : "#94a3b8",
-                  fontWeight: 700,
-                }}
-              >
-                {currentSignal?.debug?.m3.isConfirmed ? "CONFIRMED" : "PENDING"}
-              </span>
-            </div>
-            <p style={{ fontSize: "0.78rem", color: "#94a3b8", margin: "6px 0 0" }}>
-              {currentSignal?.debug?.m3.reason || "M3 momentum and structural swing anchor evaluation"}
-            </p>
-          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            {registeredStrategies.map((strat) => {
+              const isSelected = strat.number === selectedStrategyNumber;
+              const hasSound = Boolean(strategySounds[strat.number]);
+              const evalRes = strat.evaluate(market, candlesForMarket, currentPrice);
 
-          <div style={{ padding: "14px", background: "rgba(255, 255, 255, 0.03)", borderRadius: "12px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <strong style={{ color: "#38bdf8", fontSize: "0.95rem" }}>4. Risk & SL Boundary Rules</strong>
-              <span style={{ fontSize: "0.72rem", color: "#22c55e", fontWeight: 700 }}>STRUCTURE-BASED</span>
-            </div>
-            <div style={{ marginTop: "8px", fontSize: "0.78rem", color: "#94a3b8", lineHeight: "1.5" }}>
-              <div>• SL Placement: <strong>{isGold ? "Swing Low/High ± 0.35pt Buffer" : "Swing Low/High ± $25.00 Buffer"}</strong></div>
-              <div>• Max Allowed Scalp SL: <strong>{isGold ? "6.50 pips ($6.50)" : "$480.00 pts"}</strong></div>
-              <div>• Min Required R:R: <strong>1 : 1.5</strong> (Targeting TP1: 1R & TP2: 2R)</div>
-            </div>
+              return (
+                <div
+                  key={strat.id}
+                  style={{
+                    padding: "12px 14px",
+                    background: isSelected
+                      ? "rgba(56, 189, 248, 0.08)"
+                      : "rgba(18, 25, 42, 0.6)",
+                    border: isSelected
+                      ? "1px solid rgba(56, 189, 248, 0.35)"
+                      : "1px solid rgba(255, 255, 255, 0.06)",
+                    borderRadius: "12px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: "10px",
+                  }}
+                >
+                  <div style={{ flex: "1 1 240px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "3px" }}>
+                      <span
+                        style={{
+                          fontSize: "0.68rem",
+                          fontWeight: 800,
+                          padding: "2px 6px",
+                          borderRadius: "4px",
+                          background: isSelected ? "#38bdf8" : "rgba(255, 255, 255, 0.1)",
+                          color: isSelected ? "#000" : "#cbd5e1",
+                        }}
+                      >
+                        {strat.number}
+                      </span>
+                      <strong style={{ fontSize: "0.88rem", color: "#f8fafc" }}>
+                        {strat.name}
+                      </strong>
+                    </div>
+                    <p style={{ fontSize: "0.73rem", color: "#94a3b8", margin: 0, lineHeight: 1.4 }}>
+                      {strat.description}
+                    </p>
+                  </div>
+
+                  {/* Actions: Sound Toggle + Switch Button */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    {/* Signal Pill */}
+                    <span
+                      style={{
+                        fontSize: "0.7rem",
+                        padding: "3px 8px",
+                        borderRadius: "5px",
+                        fontWeight: 800,
+                        background:
+                          evalRes.side === "BUY"
+                            ? "rgba(34, 197, 94, 0.2)"
+                            : evalRes.side === "SELL"
+                            ? "rgba(239, 68, 68, 0.2)"
+                            : "rgba(234, 179, 8, 0.2)",
+                        color:
+                          evalRes.side === "BUY"
+                            ? "#22c55e"
+                            : evalRes.side === "SELL"
+                            ? "#ef4444"
+                            : "#eab308",
+                      }}
+                    >
+                      {evalRes.side}
+                    </span>
+
+                    {/* Sound Alert Toggle Button for this strategy */}
+                    <button
+                      onClick={() => handleToggleStrategySound(strat.number)}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "5px",
+                        padding: "5px 10px",
+                        borderRadius: "6px",
+                        fontSize: "0.72rem",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        background: hasSound
+                          ? "rgba(34, 197, 94, 0.2)"
+                          : "rgba(100, 116, 139, 0.2)",
+                        border: hasSound
+                          ? "1px solid rgba(34, 197, 94, 0.45)"
+                          : "1px solid rgba(100, 116, 139, 0.3)",
+                        color: hasSound ? "#86efac" : "#94a3b8",
+                        transition: "all 0.15s ease",
+                      }}
+                      title={`Toggle Alert Sound for Strategy ${strat.number}`}
+                    >
+                      <span>{hasSound ? "🔔" : "🔕"}</span>
+                      <span>{hasSound ? "Alert: ON" : "Alert: OFF"}</span>
+                    </button>
+
+                    {/* Switch Button */}
+                    <button
+                      onClick={() => handleSelectStrategy(strat.number)}
+                      style={{
+                        padding: "5px 12px",
+                        borderRadius: "6px",
+                        fontSize: "0.72rem",
+                        fontWeight: 800,
+                        cursor: "pointer",
+                        background: isSelected
+                          ? "rgba(56, 189, 248, 0.25)"
+                          : "rgba(255, 255, 255, 0.08)",
+                        border: isSelected
+                          ? "1px solid #38bdf8"
+                          : "1px solid rgba(255, 255, 255, 0.15)",
+                        color: isSelected ? "#38bdf8" : "#f1f5f9",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      {isSelected ? "✓ កំពុងមើល (Active)" : "👉 ប្តូរមកប្រើ (Switch)"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -1704,8 +2835,11 @@ function App() {
     return (
       <section className="page-card">
         {renderMarketSwitch()}
-        <span className="eyebrow">TRADING JOURNAL & PERFORMANCE — {market}</span>
-        <h2>Journal & Performance Analytics</h2>
+        {renderStrategySwitcherBar("journal")}
+        <span className="eyebrow">
+          TRADING JOURNAL & PERFORMANCE — STRATEGY {selectedStrategyNumber} ({market})
+        </span>
+        <h2>Journal & Performance Analytics — {activeStrategy.shortName}</h2>
 
         {/* Sub-Tabs: Journal Records vs 7-Day Performance Scorecard */}
         <div
@@ -1734,7 +2868,7 @@ function App() {
               transition: "all 0.15s ease",
             }}
           >
-            📋 Trade Records
+            📋 Trade Records ({activeStrategy.shortName})
           </button>
 
           <button
@@ -1751,11 +2885,11 @@ function App() {
               transition: "all 0.15s ease",
             }}
           >
-            📊 7-Day Scorecard
+            📊 7-Day Scorecard & Comparison
           </button>
         </div>
 
-        {/* TAB 1: 7-DAY PERFORMANCE SCORECARD (Preserved from Backtest) */}
+        {/* TAB 1: 7-DAY PERFORMANCE SCORECARD & STRATEGY COMPARISON */}
         {journalTab === "scorecard" ? (
           <div>
             {/* Calendar Date Notice */}
@@ -1770,16 +2904,23 @@ function App() {
                 marginBottom: "16px",
                 display: "flex",
                 alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
                 gap: "8px",
               }}
             >
-              <span>📅</span>
-              <span>
-                រយៈពេលគិតតាមថ្ងៃទី ខែ ឆ្នាំ (៧ ថ្ងៃចុងក្រោយ)៖ <strong>{report.dateRangeLabel}</strong>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span>📅</span>
+                <span>
+                  រយៈពេលគិតតាមថ្ងៃទី ខែ ឆ្នាំ (៧ ថ្ងៃចុងក្រោយ)៖ <strong>{report.dateRangeLabel}</strong>
+                </span>
+              </div>
+              <span style={{ fontSize: "0.72rem", color: "#fbbf24", fontWeight: 700 }}>
+                Lot Size: {selectedLotSize} Lot
               </span>
             </div>
 
-            {/* 4 Scorecard Boxes */}
+            {/* 4 Scorecard Boxes for currently active strategy */}
             <div className="backtest-grid">
               <div>
                 <span>WIN RATE (7D)</span>
@@ -1802,8 +2943,16 @@ function App() {
               </div>
             </div>
 
-            {/* Detailed Statistics Table */}
+            {/* Detailed Statistics Table for Active Strategy */}
             <div style={{ marginTop: "16px", padding: "14px", background: "rgba(255, 255, 255, 0.03)", borderRadius: "12px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid rgba(255, 255, 255, 0.06)", fontSize: "0.8rem" }}>
+                <span style={{ color: "#64748b" }}>Active Strategy</span>
+                <strong style={{ color: "#38bdf8" }}>Strategy {report.strategyNumber} ({report.strategyName})</strong>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid rgba(255, 255, 255, 0.06)", fontSize: "0.8rem" }}>
+                <span style={{ color: "#64748b" }}>Selected Lot Size</span>
+                <strong style={{ color: "#fbbf24" }}>{selectedLotSize} Lot</strong>
+              </div>
               <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid rgba(255, 255, 255, 0.06)", fontSize: "0.8rem" }}>
                 <span style={{ color: "#64748b" }}>Evaluation Period</span>
                 <strong style={{ color: "#38bdf8" }}>៧ ថ្ងៃចុងក្រោយ ({report.dateRangeLabel})</strong>
@@ -1825,20 +2974,148 @@ function App() {
                 <strong>Long: {report.longWinRate} | Short: {report.shortWinRate}</strong>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid rgba(255, 255, 255, 0.06)", fontSize: "0.8rem" }}>
-                <span style={{ color: "#64748b" }}>Trade Expectancy (per 0.01 lot)</span>
+                <span style={{ color: "#64748b" }}>Trade Expectancy (per {selectedLotSize} lot)</span>
                 <strong style={{ color: "#22c55e" }}>{report.expectancy}</strong>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: "0.8rem" }}>
-                <span style={{ color: "#64748b" }}>Calculation Model</span>
-                <strong style={{ color: "#22c55e" }}>Calendar Date-Based (Strict 7 Days Window)</strong>
+                <span style={{ color: "#64748b" }}>Isolation Guarantee</span>
+                <strong style={{ color: "#22c55e" }}>100% Isolated (ទិន្នន័យដាច់ដោយឡែកពី Strategy ផ្សេង)</strong>
+              </div>
+            </div>
+
+            {/* SIDE-BY-SIDE STRATEGY PERFORMANCE COMPARISON TABLE */}
+            <div style={{ marginTop: "24px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                <div>
+                  <span className="eyebrow" style={{ color: "#38bdf8", fontSize: "0.72rem" }}>
+                    STRATEGY PERFORMANCE COMPARISON (ប្រៀបធៀបយុទ្ធសាស្ត្រទាំង 3)
+                  </span>
+                  <h3 style={{ margin: "2px 0 0", fontSize: "1.05rem", color: "#f8fafc" }}>
+                    តារាងប្រៀបធៀបដឹងថា Strategy មួយណាខ្លាំង & ចំណេញជាងគេ
+                  </h3>
+                </div>
+                <span style={{ fontSize: "0.68rem", color: "#fbbf24", fontWeight: 700, padding: "3px 8px", background: "rgba(245, 158, 11, 0.15)", borderRadius: "6px", border: "1px solid rgba(245, 158, 11, 0.3)" }}>
+                  Lot: {selectedLotSize} Lot
+                </span>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" }}>
+                {comparisonReport.map((item) => {
+                  const isCurrent = item.strategyNumber === selectedStrategyNumber;
+
+                  return (
+                    <div
+                      key={item.strategyNumber}
+                      onClick={() => handleSelectStrategy(item.strategyNumber)}
+                      style={{
+                        background: isCurrent ? "rgba(56, 189, 248, 0.14)" : "rgba(18, 25, 42, 0.75)",
+                        border: isCurrent ? "2px solid #38bdf8" : "1px solid rgba(255, 255, 255, 0.08)",
+                        borderRadius: "14px",
+                        padding: "14px 12px",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                        position: "relative",
+                        boxShadow: isCurrent ? "0 0 16px rgba(56, 189, 248, 0.3)" : "none",
+                      }}
+                    >
+                      {isCurrent && (
+                        <span
+                          style={{
+                            position: "absolute",
+                            top: "-10px",
+                            right: "12px",
+                            background: "#38bdf8",
+                            color: "#000",
+                            fontSize: "0.6rem",
+                            fontWeight: 900,
+                            padding: "2px 8px",
+                            borderRadius: "9999px",
+                            letterSpacing: "0.04em",
+                          }}
+                        >
+                          កំពុងប្រើ (ACTIVE)
+                        </span>
+                      )}
+
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
+                        <span
+                          style={{
+                            fontSize: "0.68rem",
+                            fontWeight: 900,
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            background: isCurrent ? "#38bdf8" : "rgba(255, 255, 255, 0.1)",
+                            color: isCurrent ? "#000" : "#94a3b8",
+                          }}
+                        >
+                          {item.strategyNumber}
+                        </span>
+                        <strong style={{ fontSize: "0.82rem", color: "#f8fafc", lineHeight: 1.2 }}>
+                          {item.shortName.replace(/^\d+\s*•\s*/, "")}
+                        </strong>
+                      </div>
+
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.74rem", margin: "5px 0" }}>
+                        <span style={{ color: "#64748b" }}>Win Rate:</span>
+                        <strong style={{ color: "#22c55e" }}>
+                          {item.winRate} {item.isBestWinRate && "🏆"}
+                        </strong>
+                      </div>
+
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.74rem", margin: "5px 0" }}>
+                        <span style={{ color: "#64748b" }}>Total Gain:</span>
+                        <strong style={{ color: "#38bdf8" }}>
+                          {item.totalGain} {item.isBestProfit && "💰"}
+                        </strong>
+                      </div>
+
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.74rem", margin: "5px 0" }}>
+                        <span style={{ color: "#64748b" }}>Profit Factor:</span>
+                        <strong style={{ color: "#f59e0b" }}>{item.profitFactor}</strong>
+                      </div>
+
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.74rem", margin: "5px 0" }}>
+                        <span style={{ color: "#64748b" }}>Net R:R:</span>
+                        <strong style={{ color: "#c084fc" }}>{item.netRR}</strong>
+                      </div>
+
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.74rem", margin: "5px 0" }}>
+                        <span style={{ color: "#64748b" }}>Trades (7D):</span>
+                        <strong style={{ color: "#cbd5e1" }}>{item.totalTrades}</strong>
+                      </div>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectStrategy(item.strategyNumber);
+                        }}
+                        style={{
+                          width: "100%",
+                          marginTop: "10px",
+                          padding: "6px 8px",
+                          borderRadius: "8px",
+                          fontSize: "0.72rem",
+                          fontWeight: 800,
+                          cursor: "pointer",
+                          border: isCurrent ? "1px solid #38bdf8" : "1px solid rgba(255, 255, 255, 0.12)",
+                          background: isCurrent ? "#38bdf8" : "rgba(255, 255, 255, 0.05)",
+                          color: isCurrent ? "#000" : "#cbd5e1",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        {isCurrent ? "✓ កំពុងជ្រើសរើស" : `Switch ទៅ Strategy ${item.strategyNumber}`}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
         ) : (
           /* TAB 2: JOURNAL RECORDS */
           <div>
-            <p style={{ color: "#94a3b8", fontSize: "0.85rem", marginBottom: "14px" }}>
-              ប្រវត្តិនៃការចូល Trade ជាក់ស្តែងតាម Lot Size <strong>0.01</strong> សម្រាប់ <strong>{market}</strong>៖
+            <p style={{ color: "#94a3b8", fontSize: "0.82rem", marginBottom: "14px", lineHeight: 1.5 }}>
+              ប្រវត្តិនៃការចូល Trade ជាក់ស្តែងសម្រាប់តែ <strong>Strategy {selectedStrategyNumber} ({activeStrategy.shortName})</strong> តាម Lot Size <strong>{selectedLotSize} Lot</strong> លើ <strong>{market}</strong> (ទិន្នន័យដាច់ដោយឡែក មិនបូកបញ្ចូល Strategy ផ្សេងឡើយ)៖
             </p>
 
             {/* 7 Time Period Filter Buttons */}
@@ -1911,6 +3188,8 @@ function App() {
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
+                flexWrap: "wrap",
+                gap: "8px",
                 padding: "8px 12px",
                 background: "rgba(255, 255, 255, 0.03)",
                 borderRadius: "8px",
@@ -1923,7 +3202,7 @@ function App() {
                 Cycle: <strong style={{ color: "#38bdf8" }}>6:00 AM – 6:00 AM</strong> ({selectedPeriod.label})
               </span>
               <span>
-                Lot Size: <strong style={{ color: "#38bdf8" }}>0.01 Lot</strong> | Trades: <strong style={{ color: "#f8fafc" }}>{totalCount}</strong>
+                Strategy: <strong style={{ color: "#38bdf8" }}>{activeStrategy.shortName}</strong> | Lot: <strong style={{ color: "#fbbf24" }}>{selectedLotSize} Lot</strong> | Trades: <strong style={{ color: "#f8fafc" }}>{totalCount}</strong>
               </span>
             </div>
 
@@ -1968,17 +3247,30 @@ function App() {
                             fontSize: "0.65rem",
                             padding: "2px 6px",
                             borderRadius: "4px",
+                            background: "rgba(245, 158, 11, 0.18)",
+                            color: "#fbbf24",
+                            fontWeight: 700,
+                            marginRight: "6px",
+                          }}
+                        >
+                          {item.lotSize || `${selectedLotSize} Lot`}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "0.65rem",
+                            padding: "2px 6px",
+                            borderRadius: "4px",
                             background: "rgba(56, 189, 248, 0.15)",
                             color: "#38bdf8",
                             fontWeight: 600,
                           }}
                         >
-                          0.01 Lot
+                          {item.targetHit || "TP1"}
                         </span>
                       </div>
                       <span
                         style={{
-                          fontSize: "0.82rem",
+                          fontSize: "0.85rem",
                           fontWeight: 800,
                           color: item.outcome === "WIN" ? "#22c55e" : "#ef4444",
                         }}
@@ -2195,6 +3487,9 @@ function App() {
         score={currentSignal?.confidenceScore || 98}
         signal={currentSignal}
       />
+
+      {/* Lot Size Selector Modal */}
+      {renderLotSizeModal()}
     </div>
   );
 }

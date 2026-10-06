@@ -9,34 +9,59 @@
 
 import { runStrategy, getStrategyById } from "../strategies/index.js";
 
-// ទាញយក 500 ទៀនប្រវត្តិសាស្ត្រពិតពី Binance
+// ទាញយក 500 ទៀនប្រវត្តិសាស្ត្រពិត: Spot Gold សម្រាប់ XAUUSD និង Binance សម្រាប់ BTCUSD
 export async function fetch500Candles(market) {
   const isGold = market === "XAUUSD";
-  const symbol = isGold ? "PAXGUSDT" : "BTCUSDT";
 
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
-    const res = await fetch(
-      `https://data-api.binance.vision/api/v3/klines?symbol=${symbol}&interval=1m&limit=500`,
-      { cache: "no-store", signal: controller.signal }
-    );
-    clearTimeout(timeoutId);
-
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 50) {
-        return data.map((k) => ({
-          time: k[0],
-          open: parseFloat(k[1]),
-          high: parseFloat(k[2]),
-          low: parseFloat(k[3]),
-          close: parseFloat(k[4]),
-          volume: parseFloat(k[5]),
-        }));
+  if (isGold) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const res = await fetch(
+        `https://api.bybit.com/v5/market/kline?category=linear&symbol=XAUUSDT&interval=1&limit=500`,
+        { cache: "no-store", signal: controller.signal }
+      );
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        const json = await res.json();
+        const list = json?.result?.list;
+        if (Array.isArray(list) && list.length > 50) {
+          return list.slice().reverse().map((k) => ({
+            time: parseInt(k[0]),
+            open: parseFloat(k[1]),
+            high: parseFloat(k[2]),
+            low: parseFloat(k[3]),
+            close: parseFloat(k[4]),
+            volume: parseFloat(k[5]),
+          }));
+        }
       }
-    }
-  } catch (e) {}
+    } catch (e) {}
+  } else {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const res = await fetch(
+        `https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=500`,
+        { cache: "no-store", signal: controller.signal }
+      );
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 50) {
+          return data.map((k) => ({
+            time: k[0],
+            open: parseFloat(k[1]),
+            high: parseFloat(k[2]),
+            low: parseFloat(k[3]),
+            close: parseFloat(k[4]),
+            volume: parseFloat(k[5]),
+          }));
+        }
+      }
+    } catch (e) {}
+  }
 
   // Fallback Bybit
   try {
